@@ -89,3 +89,73 @@ function gen_rho_dodeca() {
 	geometry.computeBoundingSphere();
 	return geometry;
 }
+
+
+
+
+function generate_BalancedPlaneGeometry() {
+	// a plane with one center vertex, the center vertex is in the barycenter of the four corners, 
+	//  resulting in a symetrical and smoth surface
+	
+	var geometry = new THREE.Geometry();
+	/*    balanced_plane
+	  01_______________02
+	   |`.           .´|
+	   |  `.   F1  .´  |
+	   |    `.   .´    |
+	   |  F4  `00   F2 | 
+	   |     .´ `.     |
+	   |   .´     `.   |
+	   | .´    F3   `. |
+	   |´_____________`|
+	  03               04
+	*/
+	
+	
+	
+	
+	geometry.vertices.push(
+		new THREE.Vector3( 0,1, 0),
+		new THREE.Vector3(-1,0,+1),
+		new THREE.Vector3(+1,0,+1),
+		new THREE.Vector3(-1,0,-1),
+		new THREE.Vector3(+1,0,-1)
+	);
+	
+	
+	geometry.updateCenter = function(){
+		this.vertices[0].x = Math.mean(
+			this.vertices[1].x,
+			this.vertices[2].x,
+			this.vertices[3].x,
+			this.vertices[4].x
+		);
+		
+		this.vertices[0].y = Math.mean(
+			this.vertices[1].y,
+			this.vertices[2].y,
+			this.vertices[3].y,
+			this.vertices[4].y
+		);
+		this.vertices[0].z = Math.mean(
+			this.vertices[1].z,
+			this.vertices[2].z,
+			this.vertices[3].z,
+			this.vertices[4].z
+		);
+		geometry.computeBoundingSphere();
+	}
+	
+	
+	geometry.faces = [];
+	geometry.faces.push(
+		new THREE.Face3( 0, 1, 2),
+		new THREE.Face3( 0, 2, 4),
+		new THREE.Face3( 0, 4, 3),
+		new THREE.Face3( 0, 3, 1)
+	);
+	
+	
+	
+	return geometry;
+}

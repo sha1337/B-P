@@ -45,7 +45,8 @@ h3 a:hover{
 </style>
 <link rel="icon" href="fav.png" type="image/png" />
 <title></title>
-<script src="js/jquery-1.11.3.min.js"></script><!-- TODO: replace with document.querySelector()   https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector -->
+<script src="js/jquery-1.11.3.min.js"></script><!-- TODO: replace with document.querySelector()
+	https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector -->
 <script src="js/three.min.js"        ></script>
 <script src="js/misc.js"             ></script>
 <script src="js/snipets.js"          ></script><!-- Included for testing of the snipets -->
@@ -54,24 +55,17 @@ var nGame = new Game();
 
 
 window.onload=(function(){
-    nGame.applySettings({
-        // CSS selectors seems to be the nices way to pass DOM-Elements:
-        "frame"				:	"#box",
-    	"versionLocation"	:	"title, .versionText",
-    	"debug"				:	true,
-        "worldSize"         :   [2,3],
-    });
+	nGame.applySettings({
+		// CSS selectors seems to be the nices way to pass DOM-Elements:
+		frame			:	"#box",
+		versionLocation	:	"title, .versionText",
+		debug			:	true,
+		worldSize		:	[40,40],
+	});
 	nGame.init();
-    nGame.start();
-	console.log(nGame);
+	nGame.start();
 });
 
-/*
-
-
-
-
-*/
 
 function Game(){
 	var VERSION = 2.0;
@@ -121,11 +115,14 @@ function Game(){
 		var ratio = this.box.width()/this.box.height();
 
 		this.scene = new THREE.Scene();
-		this.renderer = new THREE.WebGLRenderer({canvas: this.box[0], antialias:true});
+		this.renderer = new THREE.WebGLRenderer({canvas: this.box[0], antialias:!true});
 		this.renderer.setSize(this.box.width(), this.box.height());
-		
-		this.cam = new THREE.PerspectiveCamera( 60, ratio, 0.1, 100 );
+		this.buildScene();
+		this.cam = new THREE.PerspectiveCamera( 60, ratio, 0.1, 1000 );
 		this.cam.position.set(0,0,5);
+	};
+	
+	this.buildScene= function(){
 		if(this.debug){
 			this.scene.add(new THREE.AxisHelper(2));
 		}// X red | y green | z blue
@@ -136,68 +133,100 @@ function Game(){
 		
 		
 		// terrain
-		var terrainResolution = 2;
 		
 		//making terrain function:
 		var ws = this.worldSize;
-		function terrain(u,v){
-			u = ws[0]*u;
-			v = ws[1]*v;
-	
-			u -=ws[0]/2;
-			v -=ws[1]/2;
-	
-	
-			var h=0;    
-			h = Math.random()*.05-0.02;
-			h *= 3;
-			var res = new THREE.Vector3(u,h,v);
-			return res;
-		};//end terrain()
+		var centerHeights = generate2DArray(
+			this.worldSize[0],
+			this.worldSize[1],
+			(x,z)=>Math.pow(Math.randomFloat(0, 2),2)-1.5);		
+		var cornerHeights = generate2DArray(this.worldSize[0],this.worldSize[1],(x,z)=>0);
 		
-		var terrainGeometry = new THREE.ParametricGeometry(
-			terrain,
-			terrainResolution*this.worldSize[0],
-			terrainResolution*this.worldSize[1]);
+		for(var x = 0; x < cornerHeights.length;x++){
+			for(var z = 0; z < cornerHeights[x].length;z++){
+				cornerHeights[x][z] = Math.mean(
+					centerHeights.wrap(x  ,z  ),
+					centerHeights.wrap(x+1,z  ),
+					centerHeights.wrap(x+1,z+1),
+					centerHeights.wrap(x  ,z+1)
+				);
+			}
+		}
+		this.cornerHeights = cornerHeights;
+		this.centerHeights = centerHeights;
+		
+		
+		function makeTile(x,z){
+			// plane at [x,x+1]×[z,z+1]
+			var obj = new Object();
 			
-		tmp = new THREE.MeshLambertMaterial({
-			color: 0x888888
-		});
+			obj.height = this.centerHeights.wrap(x,z);// Math.randomFloat(-0.5 , 0.5);
+			
+			obj.heightCorners = new Array(4);
+			obj.heightCorners[0] = this.cornerHeights.wrap(x+1,z  );
+			obj.heightCorners[1] = this.cornerHeights.wrap(x+1,z+1);
+			obj.heightCorners[2] = this.cornerHeights.wrap(x  ,z  );
+			obj.heightCorners[3] = this.cornerHeights.wrap(x  ,z+1);
+						
+			obj.geo = generate_BalancedPlaneGeometry();
+			// obj.geo.vertices should be a array of length 4
+			obj.geo.vertices[1].set(x+0 , obj.heightCorners[3] , z+1 );
+			obj.geo.vertices[2].set(x+1 , obj.heightCorners[1] , z+1 );
+			obj.geo.vertices[3].set(x+0 , obj.heightCorners[2] , z+0   );
+			obj.geo.vertices[4].set(x+1 , obj.heightCorners[0] , z+0);
+			obj.geo.updateCenter();
+			
+			obj.geo.verticesNeedUpdate=true;
+			
+			obj.mat; //= new THREE.MeshBasicMaterial({color: 0x333333, wireframe:true});
+			obj.mat = new THREE.MeshPhongMaterial({
+				color: new THREE.Color(3/16,Math.randomFloat(.9,1),3/16), //Math.randomFloat(0x33ff33, 0x33 ),
+				specular: 0xff0000,
+				reflectivity: 5, //
+				shininess: 0,// sanded -> polished
+				shading: THREE.FlatShading
+			});
+			
+			//*/
+			//new THREE.MeshLambertMaterial({color: 0x33ff33,wireframe	: false});
+			
+			obj.mesh = new THREE.Mesh( obj.geo, obj.mat );
+			this.scene.add(obj.mesh);
+			
+			return obj;
+		}//end makeTile()
+		makeTile=makeTile.bind(this);
+		this.terrainTile = generate2DArray(this.worldSize[0],this.worldSize[1],makeTile);
 		
-		var terrainMesh = new THREE.Mesh( terrainGeometry, tmp );
-		this.scene.add(terrainMesh);
-		
-		console.log(this.scene);
 		
 		function waterLevel(u,v){
-			var h=0
-			var scale = 10;
-			//h = Math.cos(80*u+90*v)*u*.1;
-			h = u *.02
-			var res = new THREE.Vector3(.5-u,h,-.5+v);
-			return res.multiplyScalar(scale);
+			u = 1-u;
+			var res = new THREE.Vector3(u*ws[0],Math.randomFloat(-.01,+0.01),v*ws[1]);
+			return res;
 		}
 		
 		var ocean= new THREE.ParametricGeometry(waterLevel,50,50);;
 		
-		var water = new THREE.MeshBasicMaterial({
-			color: 0x0000ff
-		});
+		var water = new THREE.MeshLambertMaterial({
+			color:0x0101ff,
+			transparent: true,
+			opacity: .5 
+		} );
 		
 		var oceanMesh = new THREE.Mesh(ocean,water);
 		this.scene.add(oceanMesh);
 		
 		
 		
-		var pointLight = new THREE.PointLight( 0xffffff);
-		pointLight.position.set(1,2,1);
-		this.scene.add( pointLight );
+		this.pointLight = new THREE.PointLight( 0xbbbbff,1,0);
+		this.pointLight.position.set(this.worldSize[0]/2 ,3, this.worldSize[1]/2);
+		this.scene.add(this.pointLight);
 
 		var sphereSize = 1;
-		var pointLightHelper = new THREE.PointLightHelper( pointLight, sphereSize );
+		var pointLightHelper = new THREE.PointLightHelper( this.pointLight, sphereSize );
 		this.scene.add( pointLightHelper );	
 		
-		var ambientLight = new THREE.AmbientLight( 0x555555 );
+		var ambientLight = new THREE.AmbientLight( 0x777777 );
 		this.scene.add(ambientLight)
 		
 		//this.scene.fog=new THREE.Fog("black", 3, 7);
@@ -207,21 +236,60 @@ function Game(){
 
 	
 	this.render = function(){
+		this.FPS.mark();
+		
 		var t = getTime();
 		
 		this.RAF_Id=requestAnimationFrame( this.render );
 		var rot = new THREE.Euler(0,t,0,'XYZ');
-		var pos = new THREE.Vector3(5,4,0);
+		var pos = new THREE.Vector3(1,0,0);
 		pos.applyEuler(rot).setLength(5);
 		
+		var lightPos = pos.clone().negate();
+		center = new THREE.Vector3(this.worldSize[0]/2,0,this.worldSize[1]/2)
+		pos.add(center).add(new THREE.Vector3(0,10,0));
+		lightPos.add(center).add(new THREE.Vector3(0,2,0));
+		
+		
+		this.pointLight.position.copy(lightPos);
 		this.cam.position.set(pos.x, pos.y, pos.z);
+		
 		var zero = new THREE.Vector3(0,0,0);
-		this.cam.lookAt(this.scene.position);
+		this.cam.lookAt(center.add(new THREE.Vector3(0,-1,0)));
 		this.renderer.render(this.scene, this.cam);
 	}//end Game.render()
 	.bind(this);
-        
 	
+	this.FPS = {
+		lastTimeStamp	: getTime(),
+		historyLength	: 50		,
+		history			: []	,
+		current			: 0		,
+		getMeanTime		: function(){
+			var mean = 0;
+			mean = this.history.reduce((prev,current) => prev+current); //sum
+			mean = mean/this.historyLength;
+			return mean;
+		},
+		
+		getMeanFPS		: function(){
+			var mean = 0;
+			mean = this.history.reduce((prev,current) => 1/prev+1/current); //sum
+			mean = mean/this.historyLength;
+			return mean;
+		},
+		
+		mark			: function(){
+			var now = getTime();
+			var delta = now - this.lastTimeStamp;
+			this.lastTimeStamp = now;
+			this.history.push(delta); // add new
+			while(this.history.length >  this.historyLength){
+				this.history.shift(); // remove oldest, until desired length
+			}
+			return delta;
+		},
+	} 
 	
 };// end Game()
 
@@ -236,5 +304,4 @@ function Game(){
 	<p></p>
 	<hr>
 	<canvas id="box"></canvas>
-    
 </body></html>
