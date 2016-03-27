@@ -1,0 +1,78 @@
+<html><head>
+<style>
+.fullscreen{
+	display	:	block	;
+	position:	fixed	;
+	top		:	0		;
+	left	:	0		;
+	width	:	100%	;
+	height	:	100%	;
+}
+</style>
+<title>mapGen</title>
+<script src="js/jquery-1.11.3.min.js"></script><!-- TODO: replace with document.querySelector()
+	https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector -->
+<script src="js/three.min.js"        ></script>
+<script src="js/misc.js"             ></script>
+<script src="js/snipets.js"          ></script><!-- Included for testing of the snipets -->
+
+<script type='text/JavaScript'>
+window.onload = function(){
+	var map ={};
+	map.size = [40,40];
+	
+	var noise = function(x,z){
+		return Math.randomFloat(0,1);
+	}
+	
+	var bowl = function(x,z){
+		x = x/map.size[0];// realative values, in [0,1]
+		z = z/map.size[1];
+		
+		x -= .5; // shift to [-.5,+.5]
+		z -= .5
+		
+		x*= 2; // scale to [-1,+1]
+		z*= 2;
+		
+		//return Math.pow(x*x + z*z,1/2);
+		return x*x + z*z;
+	} 
+	
+	var generator = 
+		bowl.then(y=>.2-y*5)
+			.then(y=>y+Math.randomFloat(-.5,+.5)); // creating an island
+	
+	
+	var centerHeights = generate2DArray(
+		map.size[0],
+		map.size[1],
+		generator// Math.randomFloat(0,1)
+	);
+	
+	
+	
+	map.cornerHeights = generate2DArray(map.size[0],map.size[1],
+		function(x,z){
+			var neighbors = [
+				centerHeights.wrap(x  ,z  ),
+				centerHeights.wrap(x+1,z  ),
+				centerHeights.wrap(x+1,z+1),
+				centerHeights.wrap(x  ,z+1)
+			];
+			var sum = neighbors.reduce((sum,ele)=>sum+ele);
+			var res = sum/neighbors.length;
+			return res;
+		}
+	);
+	
+	
+	var mapString = JSON.stringify(map, null, '\t');
+	$("#output").text(mapString);
+};
+</script>
+</head><body>
+<textarea id="output" cols="50" rows="25" class="fullscreen">
+
+</textarea>
+</body></html>

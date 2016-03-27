@@ -1,3 +1,5 @@
+"use strict";
+
 function gen_cross_cap(){
 	function surf(u,v){
 		// http://mathworld.wolfram.com/Cross-Cap.html
@@ -13,8 +15,6 @@ function gen_cross_cap(){
 	var geometry = new THREE.ParametricGeometry(surf,20,20);
 	return geometry;
 }
-
-
  
 function gen_rho_dodeca() {
 //https://en.wikipedia.org/wiki/Rhombic_dodecahedron
@@ -91,71 +91,115 @@ function gen_rho_dodeca() {
 }
 
 
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 
 
-function generate_BalancedPlaneGeometry() {
-	// a plane with one center vertex, the center vertex is in the barycenter of the four corners, 
-	//  resulting in a symetrical and smoth surface
-	
-	var geometry = new THREE.Geometry();
-	/*    balanced_plane
-	  01_______________02
-	   |`.           .´|
-	   |  `.   F1  .´  |
-	   |    `.   .´    |
-	   |  F4  `00   F2 | 
-	   |     .´ `.     |
-	   |   .´     `.   |
-	   | .´    F3   `. |
-	   |´_____________`|
-	  03               04
-	*/
-	
-	
-	
-	
-	geometry.vertices.push(
-		new THREE.Vector3( 0,1, 0),
-		new THREE.Vector3(-1,0,+1),
-		new THREE.Vector3(+1,0,+1),
-		new THREE.Vector3(-1,0,-1),
-		new THREE.Vector3(+1,0,-1)
-	);
-	
-	
-	geometry.updateCenter = function(){
-		this.vertices[0].x = Math.mean(
-			this.vertices[1].x,
-			this.vertices[2].x,
-			this.vertices[3].x,
-			this.vertices[4].x
-		);
-		
-		this.vertices[0].y = Math.mean(
-			this.vertices[1].y,
-			this.vertices[2].y,
-			this.vertices[3].y,
-			this.vertices[4].y
-		);
-		this.vertices[0].z = Math.mean(
-			this.vertices[1].z,
-			this.vertices[2].z,
-			this.vertices[3].z,
-			this.vertices[4].z
-		);
-		geometry.computeBoundingSphere();
-	}
-	
-	
-	geometry.faces = [];
-	geometry.faces.push(
-		new THREE.Face3( 0, 1, 2),
-		new THREE.Face3( 0, 2, 4),
-		new THREE.Face3( 0, 4, 3),
-		new THREE.Face3( 0, 3, 1)
-	);
-	
-	
-	
-	return geometry;
+function loadImageFromURL(imageURL,then){
+	var imageObj = new Image(); // make Object
+	imageObj.src = imageURL;
+	loadImageFromObject(imageObj,then);
 }
+
+function loadImageFromObject(imgVar, then){
+	if(imgVar.complete){ //is Image loaded?
+		var can = document.createElement("canvas");
+		
+		var xDim = imgVar.width;
+		var yDim = imgVar.height;
+		
+		console.log("loading complete ["+ imgVar.src +", "+xDim+","+yDim+"]");
+		
+		can.width = xDim;
+		can.height = yDim;
+		
+		can = can.getContext('2d');
+		can.drawImage(imgVar, 0, 0); 
+		var data = can.getImageData(0,0, xDim, yDim).data;
+		
+		var mat = new Array(xDim);
+		for (var x = 0; x<xDim;x++){
+			mat[x] = new Array(yDim)
+			for (var y = 0; y<yDim;y++){
+				var i = (y*xDim+x)*4;
+				var red   = data[i+0];
+				var green = data[i+1];
+				var blue  = data[i+2];
+				var alpha = data[i+3];
+				
+				mat[x][y] = [red,green,blue,alpha]; //[data[i],data[i+1],data[i+2],data[i+3]];
+			}
+		}
+		then(mat);
+	}
+	else{
+		console.log("waiting ["+imgVar.src+"]")
+		imgVar.onload = function() {
+			loadImageFromObject(imgVar,then);
+		};
+	};
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+
+/*
+function Map(){
+	this.isLoaded     = false;
+	this.dimensions   = [1,1];
+	this.onload       = void; 
+	this.getHeightMap = function(x,z){
+		var y = 0;
+		// advanced code here;
+		return y;
+	}  
+}
+*/
+
+///////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+
+function Timer(){
+	// maybe this could be used to make a "pause"-able game/application.
+	var t		= getTime();
+	var dt		= 0;
+	var running	= false;
+	
+	this.start = function(){
+		if(!running){
+			t = getTime()-dt;
+			running = true;
+		}
+		recalc();
+		return dt;
+	};
+	this.read = function(){
+		recalc()
+		return dt;
+	};
+	var recalc = function(){
+		if (running){
+			dt = getTime()-t;
+		}
+	}
+	this.stop = function(){
+		recalc()
+		running = false;
+		return dt;
+	};
+	this.reset = function(){
+		t		= getTime();
+		dt		= 0;
+		running	= false;
+	}
+	this.isRunning = function(){
+		return running;
+	};
+	this.startStop = function(){
+		if (running)
+			this.stop()
+		else
+			this.stop()
+		return running;
+	};
+}// end Timer()
